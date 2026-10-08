@@ -1,0 +1,342 @@
+{
+  "pullRequest": {
+    "owner": "udacity",
+    "repo": "cd14715-simple-todo-app",
+    "number": 2
+  },
+  "fileReviews": [
+    {
+      "file": "src/todo.ts",
+      "codeQuality": {
+        "file": "src/todo.ts",
+        "issues": [
+          {
+            "line": 120,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL injection vulnerability: Direct string interpolation of user input (keyword) into SQL query using template literals. An attacker could inject malicious SQL code through the keyword parameter.",
+            "suggestion": "Use parameterized queries with placeholders: const query = 'SELECT * FROM todos WHERE title LIKE ? OR description LIKE ?'; await db.query(query, [`%${keyword}%`, `%${keyword}%`]);"
+          },
+          {
+            "line": 131,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL injection vulnerability: Direct string concatenation of user input (completed) into SQL query without any validation or parameterization. This allows arbitrary SQL execution.",
+            "suggestion": "Use parameterized queries: const sql = 'SELECT * FROM todos WHERE completed = ?'; await db.query(sql, [completed]);"
+          },
+          {
+            "line": 143,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL injection vulnerability: User-supplied userId is directly embedded in SQL query using template literals without sanitization, allowing SQL injection attacks through the userId parameter.",
+            "suggestion": "Use parameterized queries: const query = 'SELECT t.* FROM todos t JOIN user_todos ut ON t.id = ut.todo_id WHERE ut.user_id = ?'; await db.query(query, [userId]);"
+          },
+          {
+            "line": 128,
+            "severity": "high",
+            "category": "bug-risk",
+            "description": "Type mismatch: The completed parameter is typed as string but should likely be boolean. The function accepts any string value ('true', 'false', '1 OR 1=1', etc.) which is both a security and correctness issue.",
+            "suggestion": "Change parameter type to boolean: export async function searchTodosByStatus(completed: boolean): Promise<Todo[]> and use parameterized query with the boolean value."
+          },
+          {
+            "line": 119,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "Missing input validation: No validation or sanitization of the keyword parameter before use. Empty strings, null, or excessively long inputs are not handled.",
+            "suggestion": "Add input validation: if (!keyword || keyword.trim().length === 0) { return []; } Add length limits and consider sanitizing special characters if parameterized queries cannot be used."
+          },
+          {
+            "line": 138,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "Missing input validation: No validation of userId parameter. Empty strings, malformed IDs, or invalid formats are not checked before database query.",
+            "suggestion": "Add input validation: if (!userId || userId.trim().length === 0) { throw new Error('Invalid userId'); } Consider validating the userId format matches expected pattern."
+          },
+          {
+            "line": 119,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Error handling missing: No try-catch block or error handling for database query failures. Database errors will propagate unhandled.",
+            "suggestion": "Add proper error handling: try { const rows = await db.query(query, params); return rows as Todo[]; } catch (error) { logger.error('Failed to search todos', error); throw new Error('Search failed'); }"
+          },
+          {
+            "line": 128,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Error handling missing: No try-catch block or error handling for database query failures in searchTodosByStatus function.",
+            "suggestion": "Wrap database operations in try-catch blocks and provide meaningful error messages to callers."
+          },
+          {
+            "line": 138,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Error handling missing: No try-catch block or error handling for database query failures in getTodosByUser function.",
+            "suggestion": "Add error handling consistent with other database operations in the module."
+          },
+          {
+            "line": 121,
+            "severity": "low",
+            "category": "performance",
+            "description": "Inefficient LIKE query: Using '%keyword%' with leading wildcard prevents index usage and causes full table scans, which will be slow on large datasets.",
+            "suggestion": "Consider using full-text search indexes or change pattern to 'keyword%' (without leading wildcard) if possible. For production systems, implement proper search engine integration (Elasticsearch, etc.)."
+          },
+          {
+            "line": 119,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Inconsistent function naming and organization: The new search functions don't follow the same pattern as existing CRUD operations (getTodo, createTodo, etc.). searchTodos and searchTodosByStatus have overlapping functionality.",
+            "suggestion": "Consider consolidating into a single searchTodos function with optional parameters: searchTodos(options: { keyword?: string, completed?: boolean, userId?: string })"
+          },
+          {
+            "line": 122,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Type casting without validation: Using 'as Todo[]' type assertion without verifying the returned data matches the Todo interface structure.",
+            "suggestion": "Add runtime validation or use a schema validation library (Zod, Yup) to ensure returned data conforms to Todo interface before casting."
+          }
+        ],
+        "overallScore": 15,
+        "summary": "CRITICAL SECURITY ISSUES: All three new functions contain SQL injection vulnerabilities due to direct string interpolation/concatenation of user input into SQL queries. These are severe security flaws that must be fixed immediately by using parameterized queries. Additional issues include missing input validation, no error handling, type inconsistencies (completed parameter should be boolean), and potential performance problems with LIKE queries. The code is not production-ready and requires significant security hardening before deployment."
+      },
+      "testCoverage": {
+        "file": "src/todo.ts",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [
+          {
+            "type": "function",
+            "location": "searchTodos(keyword: string)",
+            "priority": "critical",
+            "reasoning": "Function has SQL injection vulnerability through string interpolation. No parameterized queries used. This is a security-critical path that requires comprehensive testing including malicious input scenarios.",
+            "suggestedTest": "Test suite should include: (1) Normal search with valid keywords, (2) Empty string input, (3) SQL injection attempts with quotes and escape characters, (4) Special characters in keywords (%, _, wildcards), (5) Unicode and emoji characters, (6) Extremely long keyword strings, (7) Null/undefined handling, (8) Multiple words with spaces."
+          },
+          {
+            "type": "function",
+            "location": "searchTodosByStatus(completed: string)",
+            "priority": "critical",
+            "reasoning": "Function has SQL injection vulnerability through string concatenation. Accepts string input that should be boolean. No input validation or type checking. Direct concatenation without parameterization makes this extremely vulnerable.",
+            "suggestedTest": "Test suite should include: (1) Valid boolean strings ('true', 'false', '0', '1'), (2) SQL injection payloads (e.g., '1 OR 1=1', 'true; DROP TABLE todos;--'), (3) Invalid type inputs (objects, arrays, null, undefined), (4) Empty string, (5) Case variations (TRUE, False, tRuE), (6) Non-boolean strings, (7) Numeric edge cases."
+          },
+          {
+            "type": "function",
+            "location": "getTodosByUser(userId: string)",
+            "priority": "critical",
+            "reasoning": "Function has SQL injection vulnerability with template literals and JOIN operations. No input sanitization on userId parameter. More complex query with JOIN makes exploitation potentially more damaging.",
+            "suggestedTest": "Test suite should include: (1) Valid UUID/GUID user IDs, (2) Numeric user IDs, (3) SQL injection with quotes to break out of string context, (4) UNION-based injection attempts, (5) Comment injection (--, /* */), (6) Empty string and null userId, (7) Special characters in userId, (8) Non-existent userId handling, (9) User with no associated todos."
+          },
+          {
+            "type": "edge-case",
+            "location": "searchTodos - empty result handling",
+            "priority": "high",
+            "reasoning": "No visible error handling for when search returns zero results. Need to verify the function returns empty array correctly rather than null or throwing error.",
+            "suggestedTest": "Test that searchTodos returns an empty array when no todos match the keyword. Verify proper handling when database query returns empty result set."
+          },
+          {
+            "type": "edge-case",
+            "location": "searchTodosByStatus - type mismatch handling",
+            "priority": "high",
+            "reasoning": "Function accepts string parameter but queries boolean database column. No validation that completed parameter is valid boolean representation. May cause database errors or unexpected behavior.",
+            "suggestedTest": "Test behavior when completed parameter is not a valid boolean string. Verify database error handling and whether function should coerce input or reject invalid values."
+          },
+          {
+            "type": "edge-case",
+            "location": "getTodosByUser - JOIN with no matches",
+            "priority": "high",
+            "reasoning": "JOIN operation may behave unexpectedly when user_todos table has no matching records. Need to verify correct empty array return vs null vs error.",
+            "suggestedTest": "Test getTodosByUser with valid userId that exists in users table but has no entries in user_todos junction table. Verify empty array is returned."
+          },
+          {
+            "type": "branch",
+            "location": "All three functions - database error handling",
+            "priority": "critical",
+            "reasoning": "No visible try-catch blocks or error handling for database failures. Functions should handle network errors, connection failures, malformed queries, and database constraint violations.",
+            "suggestedTest": "Mock database query failures for each function: (1) Connection timeout, (2) Database unavailable, (3) SQL syntax error, (4) Permission denied error. Verify appropriate error types are thrown and error messages don't leak SQL query details."
+          },
+          {
+            "type": "edge-case",
+            "location": "searchTodos - LIKE pattern escaping",
+            "priority": "high",
+            "reasoning": "Function uses LIKE with hardcoded % wildcards. User input containing %, _, or \\ characters will be interpreted as SQL wildcards rather than literals. Need escaping mechanism.",
+            "suggestedTest": "Test searchTodos with keywords containing SQL wildcard characters: (1) keyword with % should not match everything, (2) keyword with _ should match literal underscore, (3) keyword with \\ should match backslash. Verify proper escaping of LIKE special characters."
+          },
+          {
+            "type": "function",
+            "location": "Integration testing for all search functions",
+            "priority": "high",
+            "reasoning": "Functions interact with database and return Todo objects. Need integration tests with real or test database to verify query correctness, returned data structure matches Todo interface, and database state is not modified.",
+            "suggestedTest": "Integration test suite: (1) Seed test database with known todos, (2) Verify each function returns correct Todo objects with all required fields, (3) Verify readonly operations don't modify database, (4) Test transaction rollback on errors, (5) Test concurrent query handling."
+          },
+          {
+            "type": "edge-case",
+            "location": "All three functions - input validation",
+            "priority": "critical",
+            "reasoning": "No input validation visible. Functions should validate input types, lengths, and formats before constructing queries. Missing validation is root cause of SQL injection vulnerabilities.",
+            "suggestedTest": "Create input validation tests: (1) Test with extremely long strings (>10000 chars), (2) Test with null/undefined parameters, (3) Test with wrong types (numbers, objects, arrays), (4) Test with binary data or buffer inputs. Each should either sanitize input or throw validation error before query execution."
+          }
+        ],
+        "coverageEstimate": 0,
+        "summary": "The three new search functions (searchTodos, searchTodosByStatus, getTodosByUser) have ZERO test coverage and contain critical SQL injection vulnerabilities. All functions use string concatenation or template literals to build SQL queries with unsanitized user input. No test files exist for these functions. Critical gaps include: no security tests for SQL injection, no input validation tests, no error handling tests for database failures, no edge case tests for empty results or type mismatches, and no integration tests with actual database. The LIKE pattern escaping in searchTodos and type coercion in searchTodosByStatus present additional untested edge cases. Immediate priority should be adding parameterized query implementations alongside comprehensive security-focused test coverage before this code reaches production."
+      },
+      "refactorings": {
+        "file": "src/todo.ts",
+        "suggestions": [
+          {
+            "type": "pattern-improvement",
+            "location": "searchTodos, searchTodosByStatus, getTodosByUser functions",
+            "impact": "high",
+            "description": "All three new functions contain SQL injection vulnerabilities through string concatenation/interpolation. This is a critical security flaw that needs immediate refactoring.",
+            "before": "SQL queries built using string concatenation and template literals: `SELECT * FROM todos WHERE title LIKE '%${keyword}%'` and similar patterns in all three functions.",
+            "after": "Use parameterized queries with placeholders: `SELECT * FROM todos WHERE title LIKE ? OR description LIKE ?` with parameters passed as array to db.query().",
+            "benefits": "Eliminates SQL injection vulnerabilities, improves security posture, follows database best practices, and maintains code safety."
+          },
+          {
+            "type": "extract-function",
+            "location": "searchTodos, searchTodosByStatus, getTodosByUser functions",
+            "impact": "medium",
+            "description": "All three search functions follow the same pattern: build query, execute query, return typed results. This duplicated structure can be extracted into a reusable helper.",
+            "before": "Each function independently calls db.query() and casts results to Todo[]. Pattern repeated across searchTodos, searchTodosByStatus, and getTodosByUser.",
+            "after": "Create a generic executeQuery<T>(query: string, params: any[]): Promise<T[]> helper function that encapsulates the query execution and type casting logic.",
+            "benefits": "Reduces code duplication, centralizes query execution logic, improves maintainability, makes testing easier, and ensures consistent error handling."
+          },
+          {
+            "type": "simplify",
+            "location": "searchTodosByStatus function",
+            "impact": "medium",
+            "description": "The completed parameter is typed as string but represents a boolean value. This creates type confusion and requires string concatenation instead of proper parameterization.",
+            "before": "Function signature: searchTodosByStatus(completed: string) with SQL: 'SELECT * FROM todos WHERE completed = ' + completed",
+            "after": "Function signature: searchTodosByStatus(completed: boolean) with parameterized query: 'SELECT * FROM todos WHERE completed = ?' and params [completed]",
+            "benefits": "Type safety improvement, clearer API contract, eliminates type confusion, enables proper parameterization, and reduces likelihood of injection attacks."
+          },
+          {
+            "type": "rename",
+            "location": "searchTodosByStatus function",
+            "impact": "low",
+            "description": "The function name 'searchTodosByStatus' is verbose compared to similar functions in the module. Could be more concise while remaining clear.",
+            "before": "Function name: searchTodosByStatus",
+            "after": "Function name: getTodosByStatus or filterByStatus to match the naming pattern of existing functions like getTodosByUser",
+            "benefits": "Improved consistency with existing function naming conventions, better readability, and more concise API."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "searchTodos function",
+            "impact": "medium",
+            "description": "The searchTodos function performs a LIKE search on multiple columns using OR conditions. This logic could be more flexible and maintainable.",
+            "before": "Hardcoded search across title and description fields with duplicate LIKE clauses: WHERE title LIKE '%${keyword}%' OR description LIKE '%${keyword}%'",
+            "after": "Create a searchable fields configuration and build the query dynamically, or accept an optional fields parameter: searchTodos(keyword: string, fields: string[] = ['title', 'description'])",
+            "benefits": "Increases flexibility, allows searching across different field combinations, improves maintainability when adding new searchable fields, and separates configuration from logic."
+          },
+          {
+            "type": "extract-function",
+            "location": "All three new search functions",
+            "impact": "medium",
+            "description": "Query building logic is mixed with business logic. Separating query construction from execution would improve separation of concerns.",
+            "before": "Each function constructs its own SQL query inline before executing it.",
+            "after": "Create query builder functions: buildSearchQuery(keyword: string), buildStatusQuery(completed: boolean), buildUserTodosQuery(userId: string) that return {query: string, params: any[]}.",
+            "benefits": "Better separation of concerns, easier to test query construction independently, improves readability, and makes it easier to add query complexity later."
+          },
+          {
+            "type": "modernize",
+            "location": "All three new search functions",
+            "impact": "low",
+            "description": "The functions use basic async/await patterns but lack proper error handling and input validation that modern TypeScript practices recommend.",
+            "before": "Functions directly execute queries without validation: export async function searchTodos(keyword: string): Promise<Todo[]>",
+            "after": "Add input validation, sanitization, and error handling: validate keyword is not empty, check userId format, handle db.query errors with try-catch, provide meaningful error messages.",
+            "benefits": "Improves robustness, provides better developer experience with clear error messages, prevents unnecessary database calls with invalid inputs, and follows defensive programming practices."
+          },
+          {
+            "type": "simplify",
+            "location": "getTodosByUser function",
+            "impact": "low",
+            "description": "The JOIN query is constructed inline making it harder to read and modify. The query complexity could benefit from formatting or extraction.",
+            "before": "Single-line JOIN query with inline template literal: `SELECT t.* FROM todos t JOIN user_todos ut ON t.id = ut.todo_id WHERE ut.user_id = '${userId}'`",
+            "after": "Use multi-line query constant or query builder: const query = `SELECT t.* FROM todos t JOIN user_todos ut ON t.id = ut.todo_id WHERE ut.user_id = ?`; const params = [userId];",
+            "benefits": "Improved readability for complex queries, easier to debug and modify, clearer separation between query structure and parameters."
+          }
+        ],
+        "summary": "The three new search functions introduce critical SQL injection vulnerabilities through string concatenation and contain significant code duplication. High-priority refactoring should focus on implementing parameterized queries to eliminate security risks, followed by extracting common query execution patterns to reduce duplication. Additional improvements include better type safety for the status parameter, consistent naming conventions, input validation, and separation of query building from execution logic."
+      }
+    }
+  ],
+  "summary": {
+    "totalFiles": 1,
+    "overallScore": 15,
+    "criticalIssues": 3,
+    "highPriorityTests": 10,
+    "refactoringOpportunities": 8
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "Security",
+      "description": "Immediately fix SQL injection vulnerabilities in all three new functions (searchTodos, searchTodosByStatus, getTodosByUser) by replacing string concatenation/interpolation with parameterized queries. These vulnerabilities allow arbitrary SQL execution and pose severe security risks.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Testing",
+      "description": "Add comprehensive test coverage for all three new search functions with focus on security testing. Include SQL injection attempt tests, input validation tests, error handling tests, and edge case testing. Current coverage is 0%.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Type Safety",
+      "description": "Fix type mismatch in searchTodosByStatus function. Change the completed parameter from string to boolean type to match the database schema and prevent type confusion that contributes to security vulnerabilities.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Error Handling",
+      "description": "Add proper error handling with try-catch blocks to all three new functions. Database operations should handle connection failures, query errors, and other exceptions gracefully without exposing sensitive information.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Input Validation",
+      "description": "Implement input validation for all function parameters (keyword, completed, userId). Validate input types, check for empty/null values, enforce length limits, and sanitize special characters before processing.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality",
+      "description": "Refactor duplicated query execution pattern by extracting a common helper function. All three functions follow the same pattern of query execution and result casting, which should be centralized.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Performance",
+      "description": "Optimize LIKE queries with leading wildcards in searchTodos function. Consider using full-text search indexes or alternative search strategies to avoid full table scans on large datasets.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "low",
+      "category": "Code Organization",
+      "description": "Improve function naming consistency and consider consolidating search functions into a single flexible search function with optional parameters for better API design.",
+      "files": [
+        "src/todo.ts"
+      ]
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-10-08T00:00:00.000Z",
+    "duration": 8500,
+    "agentVersions": {
+      "code-quality-analyzer": "ac7204f",
+      "test-coverage-analyzer": "a2f0162",
+      "refactoring-suggester": "af8eb3c"
+    }
+  }
+}
